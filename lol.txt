@@ -1,0 +1,10 @@
+.*.baidu.com:\d+
+.*.qq.com:\d+
+.*.sina.com:\d+
+.*.163.com:\d+
+mirrors.tuna.tsinghua.edu.cn:\d+
+.*.cn:\d+
+.*.com.cn:\d+
+.*.org.cn:\d+
+192.168..*
+.*.qt.io:\d+
