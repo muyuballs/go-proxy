@@ -13,6 +13,19 @@ import (
 	"time"
 )
 
+var (
+	HopByHops = []string{"Proxy-Connection", "Connection", "Proxy-Authenticate", "Keep-Alive"}
+)
+
+func trimRequestHeader(ctx *fasthttp.RequestCtx) {
+	reqHeader := ctx.Request.Header
+	for _, h := range HopByHops {
+		reqHeader.Del(h)
+	}
+	reqHeader.SetConnectionClose()
+	ctx.Request.Header = reqHeader
+}
+
 func copyHttpPayload(ctx *fasthttp.RequestCtx, sessionInfo *SessionInfo, rconn *common.ACStream, conf *common.Config) {
 	var sessionReqCache = ""
 	var sessionRespCache = ""

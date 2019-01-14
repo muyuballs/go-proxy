@@ -16,6 +16,7 @@ func handClient(conf *common.Config, conn net.Conn) {
 		log.Println(err)
 		return
 	}
+	//http.HandleHttps(acs.Open())
 	var remote string
 	if v[0] == socks.SocksVer4 {
 		remote, err = socks.HandleSocks4(acs)

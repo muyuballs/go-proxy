@@ -3,28 +3,32 @@ package http
 import (
 	"crypto/tls"
 	"github.com/muyuballs/go-proxy/core/common"
+	"github.com/valyala/fasthttp"
 	"log"
 	"net"
 	"net/http"
-	"os"
-	"strings"
-
-	"github.com/valyala/fasthttp"
 )
 
 var (
 	HttpsPrefixLen = len("http://")
-	_https_server  = &fasthttp.Server{
+	_httpsServer   = &fasthttp.Server{
 		Name: "sot-https",
 	}
 )
 
 func initHttpsHandler(conf *common.Config) {
-	_https_server.Handler = httpsHandler(conf)
+	_httpsServer.Handler = httpsHandler(conf)
+}
+func HandleHttps(acs *common.ACStream) (err error) {
+	return handleHttps(common.NewACS(tls.Server(acs, &tls.Config{
+		GetCertificate: func(info *tls.ClientHelloInfo) (certificate *tls.Certificate, e error) {
+			return genCertificate(info.ServerName)
+		},
+	})))
 }
 
 func handleHttps(acs *common.ACStream) (err error) {
-	return _https_server.ServeConn(acs)
+	return _httpsServer.ServeConn(acs)
 }
 
 func httpsHandler(conf *common.Config) func(*fasthttp.RequestCtx) {
@@ -70,25 +74,10 @@ func httpsHandler(conf *common.Config) func(*fasthttp.RequestCtx) {
 				sessionInfo.SessionDone()
 				return
 			}
-			reqPath := GetMappedPath(sessionInfo.RequestInfo.FullUrl)
-			if strings.HasPrefix(reqPath, "file://") {
-				log.Println("send local file")
-				fi, err := os.Open(reqPath)
-				if err != nil {
-					ctx.Error(err.Error(), http.StatusInternalServerError)
-					sessionInfo.SessionDone()
-					return
-				}
-				ctx.SetBodyStream(fi, -1)
+			if handleRedirect(sessionInfo.RequestInfo.FullUrl, ctx) {
 				return
 			}
-			reqHeader := ctx.Request.Header
-			reqHeader.SetRequestURIBytes([]byte(TrimHttpPrefix(reqPath)))
-			for _, h := range HopByHops {
-				reqHeader.Del(h)
-			}
-			reqHeader.SetConnectionClose()
-			ctx.Request.Header = reqHeader
+			trimRequestHeader(ctx)
 			rconn, err := common.DialRemote(conf, nil, target)
 			if err != nil {
 				log.Println(err)

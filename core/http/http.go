@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -31,8 +30,7 @@ var (
 		2: "TlS 1.1",
 		3: "TlS 1.2",
 	}
-	HopByHops = []string{"Proxy-Connection", "Connection", "Proxy-Authenticate", "Keep-Alive"}
-	_server   = &fasthttp.Server{
+	_server = &fasthttp.Server{
 		Name: "sot",
 	}
 )
@@ -167,25 +165,10 @@ func httpHandler(conf *common.Config) func(*fasthttp.RequestCtx) {
 				sessionInfo.SessionDone()
 				return
 			}
-			reqPath := GetMappedPath(sessionInfo.RequestInfo.FullUrl)
-			if strings.HasPrefix(reqPath, "file://") {
-				log.Println("send local file")
-				fi, err := os.Open(reqPath)
-				if err != nil {
-					ctx.Error(err.Error(), http.StatusInternalServerError)
-					sessionInfo.SessionDone()
-					return
-				}
-				ctx.SetBodyStream(fi, -1)
+			if handleRedirect(sessionInfo.RequestInfo.FullUrl, ctx) {
 				return
 			}
-			reqHeader := ctx.Request.Header
-			reqHeader.SetRequestURIBytes([]byte(TrimHttpPrefix(reqPath)))
-			for _, h := range HopByHops {
-				reqHeader.Del(h)
-			}
-			reqHeader.SetConnectionClose()
-			ctx.Request.Header = reqHeader
+			trimRequestHeader(ctx)
 			rconn, err := common.DialRemote(conf, nil, target)
 			if err != nil {
 				log.Println(err)

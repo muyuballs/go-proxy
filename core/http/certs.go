@@ -11,18 +11,17 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 )
 
-const Year = time.Hour * 24 * 1
 const RootCertificateName = "root"
 const StoreDir = "easypki"
 
 var (
 	commonSubject = pkix.Name{
-		Organization: []string{"SOT DO NOT TRUST"},
+		Organization:       []string{"SOT DO NOT TRUST"},
+		OrganizationalUnit: []string{"Created by http://github.com/muyuballs/go-proxy", "Powered by https://github.com/google/easypki"},
 	}
 	certCache, _ = lru.New(5000)
 	genlock      = &sync.Mutex{}
@@ -51,7 +50,8 @@ func InitCertCache(cache string) (err error) {
 		log.Println(err)
 		log.Println("root not found ,create it")
 		caRequest := &easypki.Request{
-			Name: RootCertificateName,
+			Name:           RootCertificateName,
+			PrivateKeySize: 2048,
 			Template: &x509.Certificate{
 				Subject:    commonSubject,
 				NotAfter:   time.Now().AddDate(100, 0, 0),
@@ -75,23 +75,19 @@ func InitCertCache(cache string) (err error) {
 }
 
 func genCertificate(domain string) (cert *tls.Certificate, err error) {
-	parts := strings.Split(domain, ".")
-	baseDomain := "*." + strings.Join(parts[len(parts)-2:], ".")
-	log.Println(baseDomain)
-	if t, ok := certCache.Get(baseDomain); ok {
-		log.Println(baseDomain, "certificate found from lru cache")
+	if t, ok := certCache.Get(domain); ok {
+		log.Println(domain, "certificate found from lru cache")
 		return t.(*tls.Certificate), nil
 	}
-	srv, err := createCertificate(baseDomain)
+	srv, err := createCertificate(domain)
 	if err != nil {
 		return nil, err
 	}
 	cert = &tls.Certificate{
 		Certificate: [][]byte{srv.Cert.Raw, caBundle.Cert.Raw},
 		PrivateKey:  srv.Key,
-		Leaf:        srv.Cert,
 	}
-	certCache.Add(baseDomain, cert)
+	certCache.Add(domain, cert)
 	return
 }
 
@@ -110,7 +106,8 @@ func createCertificate(domain string) (srv *certificate.Bundle, err error) {
 			NotAfter: time.Now().AddDate(10, 0, 0),
 			DNSNames: []string{domain},
 		},
-		PrivateKeySize: 4096,
+		PrivateKeySize:      2048,
+		IsClientCertificate: false,
 	}
 	srvRequest.Template.Subject.CommonName = domain
 	if err := pki.Sign(caBundle, srvRequest); err != nil {
