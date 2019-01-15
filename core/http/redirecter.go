@@ -13,7 +13,7 @@ func handleRedirect(fullUrl string, ctx *fasthttp.RequestCtx) bool {
 	if ri == nil {
 		return false
 	}
-
+	ctx.SetConnectionClose()
 	if ri.Type == RedirectCustom {
 		code, _ := strconv.Atoi(ri.Target)
 		if ri.Headers != nil {
